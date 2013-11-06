@@ -2,6 +2,7 @@
 <resources>
 
     <string name="app_name">KDFTest</string>
+    <string name="action_settings">KDFTest</string>
     <string name="pw_description">Please input a string in the password field</string>
     <string name="apply_pbkdf2">Apply standard PBKDF2</string>
     <string name="apply_mykdf">Apply custom KDF</string>

@@ -4,19 +4,24 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
+import android.util.Log;
+
 public class MyKDF {
+	
+	private static final String TAG = "MyKDF";
 
 	public static final String DEFAULT_ALGORITHM = "md5";
 	private MessageDigest md;
 	private byte[] state;
 	private byte[] salt;
 	private int iterations;
-	
+
 	public MyKDF(byte[] salt, int iterations) throws NoSuchAlgorithmException {
 		this(salt, iterations, DEFAULT_ALGORITHM);
 	}
-	
-	public MyKDF(byte[] salt, int iterations, String hashalgorithm) throws NoSuchAlgorithmException {
+
+	public MyKDF(byte[] salt, int iterations, String hashalgorithm)
+			throws NoSuchAlgorithmException {
 		this.iterations = iterations;
 		this.md = MessageDigest.getInstance(hashalgorithm);
 		this.salt = salt;
@@ -34,12 +39,13 @@ public class MyKDF {
 		SecureRandom rnd = new SecureRandom();
 		rnd.nextBytes(this.salt);
 	}
-	
+
 	public byte[] getSalt() {
 		return salt;
 	}
 
 	public byte[] derive(byte[] input) {
+		Log.d(TAG, "Deriving key from input using " + md.getClass().getCanonicalName());
 		md.update(input);
 		md.update(salt);
 		this.state = md.digest();
@@ -57,16 +63,7 @@ public class MyKDF {
 		return derive(input.getBytes());
 	}
 
-	protected String b16encode(byte[] input) {
-		StringBuilder sb = new StringBuilder(input.length * 2);
-		for (byte b : input) {
-			sb.append(b >> 4);
-			sb.append((b & 0xf0) >> 4);
-		}
-		return sb.toString();
-	}
-
 	public String deriveHex(String input) {
-		return b16encode(derive(input));
+		return PasswordInput.b16encode(derive(input));
 	}
 }
