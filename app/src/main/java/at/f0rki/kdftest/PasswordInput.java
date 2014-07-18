@@ -17,18 +17,22 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 import java.io.IOException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 
+import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 
 public class PasswordInput extends Activity {
 
     private static final String TAG = "PasswordInputActivity";
-    private static final int ITERATIONCOUNT = 100;
+    private static final int ITERATIONCOUNT = 1001;
     private static final int DERIVEDKEYLENGTH = 128;
     private static final int SALTSIZE = 8;
 
@@ -65,6 +69,14 @@ public class PasswordInput extends Activity {
         EditText pwbox = (EditText) findViewById(R.id.passwordBox);
         String password = pwbox.getText().toString();
         new MyKDFDerivator().execute(password);
+    }
+
+    public void encryptStuff(View view) {
+        EditText pwbox = (EditText) findViewById(R.id.passwordBox);
+        String password = pwbox.getText().toString();
+        EditText inputbox = (EditText) findViewById(R.id.encryptInputText);
+        String inputData = inputbox.getText().toString();
+        new PBEncryptionTask().execute(password, inputData);
     }
 
     protected void sendToServer(String whatever) {
@@ -167,6 +179,63 @@ public class PasswordInput extends Activity {
         protected void onPostExecute(byte[] result) {
             Toast toast = Toast.makeText(getApplicationContext(),
                     "Successfully applied MYKDF", Toast.LENGTH_LONG);
+            toast.show();
+            TextView derived = (TextView) findViewById(R.id.derivedValue);
+            String b16 = b16encode(result);
+            derived.setText(b16);
+        }
+    }
+
+    class PBEncryptionTask extends AsyncTask<String, Void, byte[]> {
+
+        byte[] encrypt(String password, String data) {
+            byte[] encryptedData = new byte[0];
+            byte[] encodedPw;
+            SecureRandom random = new SecureRandom();
+            byte[] salt = new byte[SALTSIZE];
+            random.nextBytes(salt);
+            KeySpec spec = new PBEKeySpec(password.toCharArray(), salt,
+                    ITERATIONCOUNT, DERIVEDKEYLENGTH);
+            SecretKeyFactory f;
+            try {
+                // that's how it should be done!
+                /*
+                f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+                Log.d(TAG, "instance for SecretKeyFactory="
+                        + f.getClass().getCanonicalName());
+                Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
+                cipher.init(Cipher.ENCRYPT_MODE, f.generateSecret(spec), random);
+                cipher.update(data.getBytes("UTF-8"));
+                encryptedData = cipher.doFinal();
+                */
+                // and here is the fail!
+                // first actually do proper key derivation
+                f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+                Log.d(TAG, "instance for SecretKeyFactory="
+                        + f.getClass().getCanonicalName());
+                encodedPw = f.generateSecret(spec).getEncoded();
+                Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
+                // but then deliberately don't use it
+                SecretKeySpec secretkey = new SecretKeySpec(MessageDigest.getInstance("MD5").digest(password.getBytes()), "AES");
+                cipher.init(Cipher.ENCRYPT_MODE, secretkey);
+                cipher.update(data.getBytes("UTF-8"));
+                encryptedData = cipher.doFinal();
+            } catch (Throwable e) {
+                Log.e(TAG, "Encryption failed", e);
+            }
+            return encryptedData;
+        }
+
+        @Override
+        protected byte[] doInBackground(String... cmd) {
+            byte[] result;
+            result = encrypt(cmd[0], cmd[1]);
+            return result;
+        }
+
+        protected void onPostExecute(byte[] result) {
+            Toast toast = Toast.makeText(getApplicationContext(),
+                    "Successfully encrypted your input", Toast.LENGTH_LONG);
             toast.show();
             TextView derived = (TextView) findViewById(R.id.derivedValue);
             String b16 = b16encode(result);

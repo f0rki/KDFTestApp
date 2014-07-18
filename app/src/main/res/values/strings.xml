@@ -6,5 +6,8 @@
     <string name="pw_description">Please input a string in the password field</string>
     <string name="apply_pbkdf2">Apply standard PBKDF2</string>
     <string name="apply_mykdf">Apply custom KDF</string>
-    
+    <string name="pbeButtonText">Apply KDF and Encrypt</string>
+    <string name="encryption_input">Type string to encrypt here</string>
+    <string name="encryptStringDefault">Some data you wish to be encrypted</string>
+
 </resources>
